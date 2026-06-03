@@ -394,9 +394,10 @@ export function DeliveryMap({ deliveryPoints, scrollZoom = false, showPolyline =
   const deferredPoints = useDeferredValue(validPoints)
 
   // Render marker nodes progressively to avoid long first-paint stalls on large routes.
+  // Only reset on data/style changes — NOT on map tile style changes, which are independent.
   useEffect(() => {
     setRenderedMarkerCount(INITIAL_MARKER_RENDER)
-  }, [deferredPoints.length, activeMapStyle, markerStyleState])
+  }, [deferredPoints.length, markerStyleState])
 
   useEffect(() => {
     if (renderedMarkerCount >= deferredPoints.length) return
@@ -547,6 +548,7 @@ export function DeliveryMap({ deliveryPoints, scrollZoom = false, showPolyline =
         <MapReadyController onReady={setMapRef} />
         <MapInteractionWatcher onStart={handleInteractStart} onEnd={handleInteractEnd} />
       <TileLayer
+        key={activeMapStyle}
         attribution={tiles.attribution}
         url={tiles.url}
         subdomains={tiles.subdomains}
