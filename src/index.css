@@ -18,6 +18,10 @@
   50%       { opacity: 1;   color: hsl(var(--primary)); }
 }
 
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 /* Bouncing dots (used by .loading-dots > span) */
 @keyframes loading-dot-bounce {
   0%, 80%, 100% { transform: translateY(0);   opacity: 0.3; }
