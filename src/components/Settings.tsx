@@ -1,10 +1,6 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from "react"
 import type { ReactNode } from "react"
-import {
-  User, Bell, Lock, Globe, Mail, Phone, Shield,
-  Eye, EyeOff, Check, Type, Copy,
-  Navigation, Palette, Database, HardDrive, Clock3, Loader2,
-} from "lucide-react"
+import { User, Bell, Lock, Globe, Mail, Phone, Shield, Eye, EyeOff, Check, Type, Copy, Navigation, Palette, Database, HardDrive, Clock3, Loader as Loader2, Plus, Trash2, Pencil, BookMarked, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { PageHeader } from "@/components/ui/page-header"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -59,7 +55,31 @@ const SESSION_STORAGE_ITEMS: StorageLocationItem[] = [
 // ─── Constants ────────────────────────────────────────────────────────────────
 const LS_DEFAULT_VIEW = "mapMarkerDefaultView"
 const LS_PROFILE = "settings_profile"
+const LS_SAVED_PALETTES = "fcalendar_saved_palettes"
 const MAP_FALLBACK = { lat: "3.0695500", lng: "101.5469179", zoom: "12" }
+
+// ─── Palette types ────────────────────────────────────────────────────────────
+interface SavedPalette {
+  id: string
+  name: string
+  colors: string[]
+  createdAt: number
+}
+
+function loadSavedPalettes(): SavedPalette[] {
+  try {
+    const v = localStorage.getItem(LS_SAVED_PALETTES)
+    if (!v) return []
+    const parsed = JSON.parse(v)
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
+function storeSavedPalettes(palettes: SavedPalette[]) {
+  localStorage.setItem(LS_SAVED_PALETTES, JSON.stringify(palettes))
+}
 
 // ─── Sidebar nav ──────────────────────────────────────────────────────────────
 // ─── Section panels ───────────────────────────────────────────────────────────
@@ -192,6 +212,59 @@ export function Settings({ section = "profile" }: { section?: SectionId }) {
   const resetRouteColorsToDefaults = useCallback(() => {
     setRoutesList(prev => prev.map((r, i) => ({ ...r, color: DEFAULT_ROUTE_COLORS[i % DEFAULT_ROUTE_COLORS.length] })))
     setRoutesListDirty(true)
+  }, [])
+
+  // ── Saved palettes state ─────────────────────────────────────────────────
+  const [savedPalettes, setSavedPalettes] = useState<SavedPalette[]>(loadSavedPalettes)
+  const [newPaletteName, setNewPaletteName] = useState("")
+  const [savePaletteOpen, setSavePaletteOpen] = useState(false)
+  const [editingPaletteId, setEditingPaletteId] = useState<string | null>(null)
+  const [editingPaletteName, setEditingPaletteName] = useState("")
+  const [deletingPaletteId, setDeletingPaletteId] = useState<string | null>(null)
+
+  const handleSavePalette = useCallback(() => {
+    const name = newPaletteName.trim()
+    if (!name || routesList.length === 0) return
+    const palette: SavedPalette = {
+      id: `palette_${Date.now()}`,
+      name,
+      colors: routesList.map(r => r.color),
+      createdAt: Date.now(),
+    }
+    setSavedPalettes(prev => {
+      const next = [palette, ...prev]
+      storeSavedPalettes(next)
+      return next
+    })
+    setNewPaletteName("")
+    setSavePaletteOpen(false)
+  }, [newPaletteName, routesList])
+
+  const handleApplyPalette = useCallback((palette: SavedPalette) => {
+    setRoutesList(prev => prev.map((r, i) => ({
+      ...r,
+      color: palette.colors[i] ?? palette.colors[palette.colors.length - 1] ?? r.color,
+    })))
+    setRoutesListDirty(true)
+  }, [])
+
+  const handleRenamePalette = useCallback((id: string, name: string) => {
+    setSavedPalettes(prev => {
+      const next = prev.map(p => p.id === id ? { ...p, name: name.trim() || p.name } : p)
+      storeSavedPalettes(next)
+      return next
+    })
+    setEditingPaletteId(null)
+    setEditingPaletteName("")
+  }, [])
+
+  const handleDeletePalette = useCallback((id: string) => {
+    setSavedPalettes(prev => {
+      const next = prev.filter(p => p.id !== id)
+      storeSavedPalettes(next)
+      return next
+    })
+    setDeletingPaletteId(null)
   }, [])
 
   const handleSaveMap = () => {
@@ -495,12 +568,13 @@ export function Settings({ section = "profile" }: { section?: SectionId }) {
             ) : (
               <>
                 {/* Preview strip */}
-                <div className="flex h-8 rounded-lg overflow-hidden border border-border shadow-sm mb-4">
+                <div className="flex h-8 rounded-lg overflow-hidden border border-border shadow-sm">
                   {routesList.map(r => (
                     <div key={r.id} className="flex-1" style={{ background: r.color }} title={`${r.name}: ${r.color}`} />
                   ))}
                 </div>
 
+                {/* Route colour rows */}
                 <div className="space-y-2">
                   {routesList.map((entry, idx) => (
                     <div key={entry.id} className="group flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 shadow-sm hover:border-primary/30 transition-colors">
@@ -569,7 +643,158 @@ export function Settings({ section = "profile" }: { section?: SectionId }) {
                   ))}
                 </div>
 
-                <div className="mt-6 flex flex-col gap-2">
+                {/* ── Saved Palettes ─────────────────────────────────────── */}
+                <div className="mt-6 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <BookMarked className="size-4 text-muted-foreground" />
+                      <p className="text-sm font-semibold text-foreground">Saved Palettes</p>
+                      {savedPalettes.length > 0 && (
+                        <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-muted px-1 text-[10px] font-bold text-muted-foreground">
+                          {savedPalettes.length}
+                        </span>
+                      )}
+                    </div>
+                    {canEditRouteColors && (
+                      <button
+                        type="button"
+                        onClick={() => { setSavePaletteOpen(true); setNewPaletteName("") }}
+                        className="flex items-center gap-1.5 h-7 px-3 rounded-lg border border-border bg-background text-xs font-medium text-foreground hover:bg-muted/50 transition-colors"
+                      >
+                        <Plus className="size-3.5" />
+                        Save current
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Save palette inline form */}
+                  {savePaletteOpen && (
+                    <div className="flex items-center gap-2 rounded-xl border border-primary/40 bg-primary/5 px-3 py-2.5">
+                      <input
+                        autoFocus
+                        type="text"
+                        placeholder="Palette name…"
+                        value={newPaletteName}
+                        onChange={e => setNewPaletteName(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') handleSavePalette()
+                          if (e.key === 'Escape') setSavePaletteOpen(false)
+                        }}
+                        maxLength={40}
+                        className="flex-1 bg-transparent text-sm outline-none text-foreground placeholder:text-muted-foreground"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleSavePalette}
+                        disabled={!newPaletteName.trim()}
+                        className="flex items-center gap-1 h-7 px-3 rounded-lg bg-primary text-primary-foreground text-xs font-semibold disabled:opacity-50 hover:opacity-90 transition-opacity"
+                      >
+                        <Check className="size-3" />
+                        Save
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSavePaletteOpen(false)}
+                        className="flex items-center justify-center size-7 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+                      >
+                        <X className="size-3.5" />
+                      </button>
+                    </div>
+                  )}
+
+                  {savedPalettes.length === 0 ? (
+                    <p className="text-xs text-muted-foreground py-2">
+                      No saved palettes yet. Enable Edit Mode then click "Save current" to save a palette.
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {savedPalettes.map(palette => (
+                        <div key={palette.id} className="group flex items-center gap-3 rounded-xl border border-border bg-card px-3 py-2.5 shadow-sm hover:border-primary/30 transition-colors">
+                          {/* Color preview strip */}
+                          <div className="flex h-7 w-24 shrink-0 overflow-hidden rounded-md border border-border/60 shadow-inner">
+                            {palette.colors.map((c, i) => (
+                              <div key={i} className="flex-1" style={{ background: c }} />
+                            ))}
+                          </div>
+
+                          {/* Name — editable inline */}
+                          {editingPaletteId === palette.id ? (
+                            <input
+                              autoFocus
+                              type="text"
+                              value={editingPaletteName}
+                              onChange={e => setEditingPaletteName(e.target.value)}
+                              onKeyDown={e => {
+                                if (e.key === 'Enter') handleRenamePalette(palette.id, editingPaletteName)
+                                if (e.key === 'Escape') { setEditingPaletteId(null); setEditingPaletteName("") }
+                              }}
+                              onBlur={() => handleRenamePalette(palette.id, editingPaletteName)}
+                              maxLength={40}
+                              className="flex-1 min-w-0 bg-transparent text-sm font-medium outline-none border-b border-primary text-foreground"
+                            />
+                          ) : (
+                            <span className="flex-1 min-w-0 text-sm font-medium text-foreground truncate">{palette.name}</span>
+                          )}
+
+                          {/* Actions */}
+                          <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                            {/* Apply */}
+                            <button
+                              type="button"
+                              title="Apply this palette"
+                              onClick={() => canEditRouteColors && handleApplyPalette(palette)}
+                              disabled={!canEditRouteColors}
+                              className="flex items-center gap-1 h-7 px-2.5 rounded-lg border border-border bg-background text-[11px] font-semibold text-foreground hover:bg-muted/60 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                            >
+                              <Check className="size-3" />
+                              Apply
+                            </button>
+                            {/* Rename */}
+                            <button
+                              type="button"
+                              title="Rename palette"
+                              onClick={() => { setEditingPaletteId(palette.id); setEditingPaletteName(palette.name) }}
+                              className="flex items-center justify-center size-7 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+                            >
+                              <Pencil className="size-3" />
+                            </button>
+                            {/* Delete */}
+                            {deletingPaletteId === palette.id ? (
+                              <div className="flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeletePalette(palette.id)}
+                                  className="flex items-center gap-1 h-7 px-2 rounded-lg bg-red-500 text-white text-[11px] font-semibold hover:bg-red-600 transition-colors"
+                                >
+                                  <Trash2 className="size-3" />
+                                  Delete
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setDeletingPaletteId(null)}
+                                  className="flex items-center justify-center size-7 rounded-lg text-muted-foreground hover:bg-muted/60 transition-colors"
+                                >
+                                  <X className="size-3.5" />
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                title="Delete palette"
+                                onClick={() => setDeletingPaletteId(palette.id)}
+                                className="flex items-center justify-center size-7 rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                              >
+                                <Trash2 className="size-3" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="mt-2 flex flex-col gap-2">
                   <button
                     disabled={!canEditRouteColors}
                     onClick={() => setResetRouteColorsConfirm(true)}
