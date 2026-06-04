@@ -1139,9 +1139,6 @@ export function RouteList({ variant = 'route-list' }: RouteListProps) {
   const [draftCoordinates, setDraftCoordinates] = useState<Record<string, { lat: string; lng: string }>>({})
   const [coordinateBaseline, setCoordinateBaseline] = useState<Record<string, { lat: string; lng: string }>>({})
   const [sortConflictPending, setSortConflictPending] = useState<SortType | null>(null)
-  // Inline start-point editing in the frozen table row
-  const [editingStartPoint, setEditingStartPoint] = useState(false)
-  const [startPointDraft, setStartPointDraft] = useState({ lat: '', lng: '' })
 
   const openRouteDetail = useCallback((routeId: string) => {
     setCurrentRouteId(routeId)
@@ -1162,19 +1159,6 @@ export function RouteList({ variant = 'route-list' }: RouteListProps) {
       setKmStartPoint(DEFAULT_MAP_CENTER)
     }
   }, [routes])
-
-  const saveStartPointEdit = useCallback(() => {
-    const lat = parseFloat(startPointDraft.lat)
-    const lng = parseFloat(startPointDraft.lng)
-    if (!isFinite(lat) || !isFinite(lng)) { setEditingStartPoint(false); return }
-    const next = { lat, lng }
-    setKmStartPoint(next)
-    setRoutes(prev => prev.map(r =>
-      r.id === currentRouteId ? { ...r, startLat: lat, startLng: lng } : r
-    ))
-    setHasUnsavedChanges(true)
-    setEditingStartPoint(false)
-  }, [startPointDraft, currentRouteId])
 
   useEffect(() => {
     if (!mapSettingsOpen) return
@@ -3245,96 +3229,70 @@ export function RouteList({ variant = 'route-list' }: RouteListProps) {
                             {isEditMode && <td className="px-4 h-9 w-12" />}
                             {visibleDataColumns.map(col => {
                               const k = col.key as string
-                              if (k === 'latitude') {
-                                return (
-                                  <td key="sp-lat" className="px-3 h-9 text-center">
-                                    {editingStartPoint ? (
-                                      <input
-                                        autoFocus
-                                        type="text"
-                                        value={startPointDraft.lat}
-                                        onChange={e => setStartPointDraft(d => ({ ...d, lat: e.target.value }))}
-                                        onKeyDown={e => { if (e.key === 'Enter') saveStartPointEdit(); if (e.key === 'Escape') setEditingStartPoint(false) }}
-                                        className="w-24 rounded border border-primary bg-background px-1.5 py-0.5 text-[11px] font-mono text-center outline-none focus:ring-1 focus:ring-primary"
-                                        placeholder="Lat"
-                                      />
-                                    ) : (
-                                      <span className="font-mono text-[11px] text-foreground/80">{kmStartPoint.lat.toFixed(6)}</span>
-                                    )}
-                                  </td>
-                                )
-                              }
-                              if (k === 'longitude') {
-                                return (
-                                  <td key="sp-lng" className="px-3 h-9 text-center">
-                                    {editingStartPoint ? (
-                                      <input
-                                        type="text"
-                                        value={startPointDraft.lng}
-                                        onChange={e => setStartPointDraft(d => ({ ...d, lng: e.target.value }))}
-                                        onKeyDown={e => { if (e.key === 'Enter') saveStartPointEdit(); if (e.key === 'Escape') setEditingStartPoint(false) }}
-                                        className="w-24 rounded border border-primary bg-background px-1.5 py-0.5 text-[11px] font-mono text-center outline-none focus:ring-1 focus:ring-primary"
-                                        placeholder="Lng"
-                                      />
-                                    ) : (
-                                      <span className="font-mono text-[11px] text-foreground/80">{kmStartPoint.lng.toFixed(6)}</span>
-                                    )}
-                                  </td>
-                                )
-                              }
-                              if (col.key === 'no') {
-                                return (
-                                  <td key="sp-no" className="px-3 h-9 text-center">
-                                    <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-bold text-primary">
-                                      <MapPin className="size-2.5" />
-                                      Start
-                                    </span>
-                                  </td>
-                                )
-                              }
-                              if (col.key === 'name') {
-                                return (
-                                  <td key="sp-name" className="px-3 h-9 text-center font-semibold text-[11px] text-foreground/70">
-                                    Starting Point
-                                  </td>
-                                )
-                              }
+                              if (k === 'no') return (
+                                <td key="sp-no" className="px-3 h-9 text-center">
+                                  <span className="inline-flex items-center justify-center size-5 rounded-full bg-primary/15 text-primary mx-auto">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 12c-2-2.5-4-4-4-7a4 4 0 0 1 8 0c0 3-2 4.5-4 7z"/><path d="M6 20c0-2 2.7-3 6-3s6 1 6 3"/></svg>
+                                  </span>
+                                </td>
+                              )
+                              if (k === 'code') return (
+                                <td key="sp-code" className="px-3 h-9 text-center">
+                                  <span className="text-[9px] font-bold tracking-wide text-foreground">QLK</span>
+                                </td>
+                              )
+                              if (k === 'name') return (
+                                <td key="sp-name" className="px-3 h-9 text-center">
+                                  <span className="text-[11px] font-semibold text-foreground">QL Kitchen</span>
+                                </td>
+                              )
+                              if (k === 'delivery') return (
+                                <td key="sp-delivery" className="px-3 h-9 text-center">
+                                  <span className="inline-block rounded-full bg-emerald-500/15 px-2 py-0.5 text-[9px] font-bold text-emerald-600 dark:text-emerald-400">Available</span>
+                                </td>
+                              )
+                              if (k === 'km') return (
+                                <td key="sp-km" className="px-3 h-9 text-center">
+                                  <span className="text-[11px] text-muted-foreground font-mono">0.00</span>
+                                </td>
+                              )
+                              if (k === 'latitude') return (
+                                <td key="sp-lat" className="px-3 h-9 text-center">
+                                  <span className="font-mono text-[11px] text-foreground/70">{kmStartPoint.lat.toFixed(6)}</span>
+                                </td>
+                              )
+                              if (k === 'longitude') return (
+                                <td key="sp-lng" className="px-3 h-9 text-center">
+                                  <span className="font-mono text-[11px] text-foreground/70">{kmStartPoint.lng.toFixed(6)}</span>
+                                </td>
+                              )
                               return <td key={`sp-${col.key}`} className="px-3 h-9" />
                             })}
                             {isActionColumnVisible && (
                               <td className="px-3 h-9 text-center">
-                                {editingStartPoint ? (
-                                  <div className="inline-flex items-center gap-1">
-                                    <button
-                                      type="button"
-                                      onClick={saveStartPointEdit}
-                                      className="flex size-6 items-center justify-center rounded bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
-                                      title="Save"
-                                    >
-                                      <Check className="size-3" />
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => setEditingStartPoint(false)}
-                                      className="flex size-6 items-center justify-center rounded border border-border text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
-                                      title="Cancel"
-                                    >
-                                      <X className="size-3" />
-                                    </button>
-                                  </div>
-                                ) : isEditMode ? (
+                                <div className="inline-flex items-center gap-1 justify-center">
                                   <button
-                                    type="button"
+                                    className="inline-flex items-center justify-center w-7 h-7 rounded-lg text-emerald-600 hover:bg-emerald-500/10 transition-all duration-150 hover:scale-110 active:scale-95"
+                                    title="Starting point info"
                                     onClick={() => {
-                                      setStartPointDraft({ lat: String(kmStartPoint.lat), lng: String(kmStartPoint.lng) })
-                                      setEditingStartPoint(true)
+                                      setSelectedPoint({
+                                        code: 'QLK',
+                                        name: 'QL Kitchen',
+                                        delivery: 'Available',
+                                        latitude: kmStartPoint.lat,
+                                        longitude: kmStartPoint.lng,
+                                        descriptions: [
+                                          { key: 'Type', value: 'Starting Point' },
+                                          { key: 'Lat', value: String(kmStartPoint.lat) },
+                                          { key: 'Lng', value: String(kmStartPoint.lng) },
+                                        ],
+                                      })
+                                      setInfoModalOpen(true)
                                     }}
-                                    className="flex size-6 items-center justify-center rounded border border-border text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors mx-auto"
-                                    title="Edit starting point"
                                   >
-                                    <Edit2 className="size-3" />
+                                    <Info className="size-3.5" />
                                   </button>
-                                ) : null}
+                                </div>
                               </td>
                             )}
                           </tr>
