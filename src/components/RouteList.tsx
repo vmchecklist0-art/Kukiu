@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from "react"
 import { useRoadDistances } from "@/hooks/use-road-distances"
 import { useRegisterRefresh } from "@/contexts/RefreshContext"
-import { ClipboardList, List, Info, Plus, Check, X, CreditCard as Edit2, Trash2, Search, Save, ArrowUp, ArrowDown, Truck, Cog, CircleCheck as CheckCircle2, MapPin, Route, CircleAlert as AlertCircle, History, MapPinned, TableProperties, Shrink, Expand, ChevronUp, ChevronDown, ChevronsUpDown, ListFilter as Filter, ChevronLeft, ChevronRight, RotateCcw, Layers, GripVertical, Columns2 as Columns, ArrowUpDown, Eye, EyeOff, Lock, Navigation2, Map as MapIcon, SlidersHorizontal } from "lucide-react"
+import { ClipboardList, List, Info, Plus, Check, X, CreditCard as Edit2, Trash2, Search, Save, ArrowUp, ArrowDown, Truck, Cog, CircleCheck as CheckCircle2, MapPin, Route, CircleAlert as AlertCircle, History, MapPinned, TableProperties, Shrink, Expand, ChevronUp, ChevronDown, ChevronsUpDown, ListFilter as Filter, ChevronLeft, ChevronRight, RotateCcw, Layers, GripVertical, Columns2 as Columns, ArrowUpDown, Eye, EyeOff, Lock, Navigation2, Map as MapIcon, SlidersHorizontal, Infinity } from "lucide-react"
 import { cn, parseSmartQuery, isDeliveryActive } from "@/lib/utils"
 import { optimizeRouteOrder } from "@/lib/route-optimizer"
 import { toast } from "sonner"
@@ -3231,9 +3231,7 @@ export function RouteList({ variant = 'route-list' }: RouteListProps) {
                               const k = col.key as string
                               if (k === 'no') return (
                                 <td key="sp-no" className="px-3 h-9 text-center">
-                                  <span className="inline-flex items-center justify-center size-5 rounded-full bg-primary/15 text-primary mx-auto">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 12c-2-2.5-4-4-4-7a4 4 0 0 1 8 0c0 3-2 4.5-4 7z"/><path d="M6 20c0-2 2.7-3 6-3s6 1 6 3"/></svg>
-                                  </span>
+                                  <Infinity className="size-3.5 text-primary/70 mx-auto" />
                                 </td>
                               )
                               if (k === 'code') return (
