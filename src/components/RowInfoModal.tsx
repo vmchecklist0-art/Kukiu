@@ -226,8 +226,8 @@ export function RowInfoModal({ open, onOpenChange, point, isEditMode, allowMarke
 
   const gmapsUrl = `https://maps.google.com/?q=${point.latitude},${point.longitude}`
   const wazeUrl = `https://waze.com/ul?ll=${point.latitude},${point.longitude}&navigate=yes`
-  const familyMartUrl = `https://fmvending.web.app/refill-service/M${String(point.code).padStart(4, "0")}`
-
+  const hasFamilyMartCode = /^\d{1,4}$/.test(String(point.code))
+  const familyMartUrl = hasFamilyMartCode ? `https://fmvending.web.app/refill-service/M${String(point.code).padStart(4, "0")}` : ""
   const openUrl = (url: string, label = "") => {
     if (pendingUrlLabel === label) {
       setPendingUrl(null)
@@ -331,7 +331,7 @@ export function RowInfoModal({ open, onOpenChange, point, isEditMode, allowMarke
         </DialogHeader>
 
         {/* Body */}
-        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overflow-x-hidden bg-background/35 px-4 py-3 md:px-5 md:py-4">
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overflow-x-hidden bg-card/90 px-4 py-3 md:px-5 md:py-4">
           {/* Information section */}
           <div className="pt-1">
             <div className="flex items-center justify-between mb-2.5">
@@ -423,7 +423,7 @@ export function RowInfoModal({ open, onOpenChange, point, isEditMode, allowMarke
                 </button>
               </div>
             ) : (
-              <div className="overflow-hidden rounded-xl">
+              <div className="overflow-hidden rounded-xl bg-card/80 border border-border/80">
                 {drafts && drafts.length > 0 ? (
                   <dl className="space-y-1.5">
                     {drafts.map((d, i) => (
@@ -448,14 +448,14 @@ export function RowInfoModal({ open, onOpenChange, point, isEditMode, allowMarke
 
                 {/* Google Maps row */}
                 {hasCoords && (
-                  <div className="overflow-hidden rounded-xl border border-border/80 bg-background/70 shadow-[inset_0_1px_0_hsl(var(--background)/0.7)]">
+                  <div className="overflow-hidden rounded-xl border border-border/80 bg-card/80 shadow-[inset_0_1px_0_hsl(var(--background)/0.7)]">
                     <div className="transition-transform duration-300 ease-in-out" style={{ display: 'grid', gridTemplateColumns: '100% 100%', transform: pendingUrlLabel === 'Google Maps' ? 'translateX(-100%)' : 'translateX(0)' }}>
                       <button onClick={() => openUrl(gmapsUrl, "Google Maps")} className="group flex w-full items-center gap-2 bg-muted/35 px-2.5 py-0.5 transition-all hover:bg-muted/65 active:scale-[0.98]">
                         <img src="/Gmaps.png" alt="Google Maps" className="h-5 w-5 rounded-md object-cover shrink-0" />
                         <span className="flex-1 text-left text-[11px] font-semibold text-foreground">Google Maps</span>
                         <ChevronRight className="size-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors shrink-0" />
                       </button>
-                      <div className="relative overflow-hidden bg-background/80">
+                      <div className="relative overflow-hidden bg-card/90">
                         <div className="absolute inset-y-0 left-0 w-1" style={{ background: 'linear-gradient(to bottom,#4285F4,#34A853)' }} />
                         <div className="flex items-center gap-2 px-3 py-1 pl-5">
                           <button
@@ -476,14 +476,14 @@ export function RowInfoModal({ open, onOpenChange, point, isEditMode, allowMarke
 
                 {/* Waze row */}
                 {hasCoords && (
-                  <div className="overflow-hidden rounded-xl border border-border/80 bg-background/70 shadow-[inset_0_1px_0_hsl(var(--background)/0.7)]">
+                  <div className="overflow-hidden rounded-xl border border-border/80 bg-card/80 shadow-[inset_0_1px_0_hsl(var(--background)/0.7)]">
                     <div className="transition-transform duration-300 ease-in-out" style={{ display: 'grid', gridTemplateColumns: '100% 100%', transform: pendingUrlLabel === 'Waze' ? 'translateX(-100%)' : 'translateX(0)' }}>
                       <button onClick={() => openUrl(wazeUrl, "Waze")} className="group flex w-full items-center gap-2 bg-muted/35 px-2.5 py-0.5 transition-all hover:bg-muted/65 active:scale-[0.98]">
                         <img src="/waze.png" alt="Waze" className="h-5 w-5 rounded-md object-cover shrink-0" />
                         <span className="flex-1 text-left text-[11px] font-semibold text-foreground">Waze</span>
                         <ChevronRight className="size-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors shrink-0" />
                       </button>
-                      <div className="relative overflow-hidden bg-background/80">
+                      <div className="relative overflow-hidden bg-card/90">
                         <div className="absolute inset-y-0 left-0 w-1" style={{ background: 'linear-gradient(to bottom,#33CCFF,#05C8F0)' }} />
                         <div className="flex items-center gap-2 px-3 py-1 pl-5">
                           <button
@@ -503,41 +503,43 @@ export function RowInfoModal({ open, onOpenChange, point, isEditMode, allowMarke
                 )}
 
                 {/* FamilyMart row */}
-                    <div className="overflow-hidden rounded-xl border border-border/80 bg-background/70 shadow-[inset_0_1px_0_hsl(var(--background)/0.7)]">
-                  <div className="transition-transform duration-300 ease-in-out" style={{ display: 'grid', gridTemplateColumns: '100% 100%', transform: pendingUrlLabel === 'FamilyMart' ? 'translateX(-100%)' : 'translateX(0)' }}>
+                {hasFamilyMartCode && (
+                  <div className="overflow-hidden rounded-xl border border-border/80 bg-card/80 shadow-[inset_0_1px_0_hsl(var(--background)/0.7)]">
+                    <div className="transition-transform duration-300 ease-in-out" style={{ display: 'grid', gridTemplateColumns: '100% 100%', transform: pendingUrlLabel === 'FamilyMart' ? 'translateX(-100%)' : 'translateX(0)' }}>
                       <button onClick={() => openUrl(familyMartUrl, "FamilyMart")} className="group flex w-full items-center gap-2 bg-muted/35 px-2.5 py-0.5 transition-all hover:bg-muted/65 active:scale-[0.98]">
-                      <img src="/FamilyMart.png" alt="FamilyMart" className="h-5 w-5 rounded-md object-cover shrink-0" />
-                      <span className="flex-1 text-left text-[11px] font-semibold text-foreground">FamilyMart</span>
-                      <ChevronRight className="size-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors shrink-0" />
-                    </button>
-                    <div className="relative overflow-hidden bg-background/80">
-                      <div className="absolute inset-y-0 left-0 w-1" style={{ background: 'linear-gradient(to bottom,#007140,#00A651)' }} />
+                        <img src="/FamilyMart.png" alt="FamilyMart" className="h-5 w-5 rounded-md object-cover shrink-0" />
+                        <span className="flex-1 text-left text-[11px] font-semibold text-foreground">FamilyMart</span>
+                        <ChevronRight className="size-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors shrink-0" />
+                      </button>
+                      <div className="relative overflow-hidden bg-card/90">
+                        <div className="absolute inset-y-0 left-0 w-1" style={{ background: 'linear-gradient(to bottom,#007140,#00A651)' }} />
                         <div className="flex items-center gap-2 px-3 py-1 pl-5">
-                        <button
-                          onClick={() => openUrl(familyMartUrl, "FamilyMart")}
-                          className="flex-1 min-w-0 flex items-center gap-2.5 text-left"
-                        >
-                          <img src="/FamilyMart.png" alt="FamilyMart" className="h-5 w-5 rounded-md object-cover shrink-0" />
-                          <p className="min-w-0 truncate text-[11px] font-semibold text-foreground leading-tight">Open FamilyMart?</p>
-                        </button>
-                        <div className="flex items-center shrink-0">
-                          <button onClick={confirmOpen} aria-label="Open FamilyMart URL" className="theme-accent-emerald flex h-6 w-6 items-center justify-center rounded-full transition-colors active:scale-95"><ExternalLink className="h-3 w-3" /></button>
+                          <button
+                            onClick={() => openUrl(familyMartUrl, "FamilyMart")}
+                            className="flex-1 min-w-0 flex items-center gap-2.5 text-left"
+                          >
+                            <img src="/FamilyMart.png" alt="FamilyMart" className="h-5 w-5 rounded-md object-cover shrink-0" />
+                            <p className="min-w-0 truncate text-[11px] font-semibold text-foreground leading-tight">Open FamilyMart?</p>
+                          </button>
+                          <div className="flex items-center shrink-0">
+                            <button onClick={confirmOpen} aria-label="Open FamilyMart URL" className="theme-accent-emerald flex h-6 w-6 items-center justify-center rounded-full transition-colors active:scale-95"><ExternalLink className="h-3 w-3" /></button>
+                          </div>
                         </div>
                       </div>
                     </div>
                   </div>
-                </div>
+                )}
 
                 {/* QR Code row — view mode, slides like other rows */}
                 {!isEditMode && qrCodeDestinationUrl && (
-                  <div className="overflow-hidden rounded-xl border border-border/80 bg-background/70 shadow-[inset_0_1px_0_hsl(var(--background)/0.7)]">
+                  <div className="overflow-hidden rounded-xl border border-border/80 bg-card/80 shadow-[inset_0_1px_0_hsl(var(--background)/0.7)]">
                     <div className="transition-transform duration-300 ease-in-out" style={{ display: 'grid', gridTemplateColumns: '100% 100%', transform: pendingUrlLabel === 'QR Code' ? 'translateX(-100%)' : 'translateX(0)' }}>
                       <button onClick={() => openUrl(qrCodeDestinationUrl, "QR Code")} className="group flex w-full items-center gap-2 bg-muted/35 px-2.5 py-0.5 transition-all hover:bg-muted/65 active:scale-[0.98]">
                         <QrCode className="h-5 w-5 text-orange-500 shrink-0 p-1" />
                         <span className="flex-1 text-left text-[11px] font-semibold text-foreground">QR Code</span>
                         <ChevronRight className="size-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors shrink-0" />
                       </button>
-                      <div className="relative overflow-hidden bg-background/80">
+                      <div className="relative overflow-hidden bg-card/90">
                         <div className="absolute inset-y-0 left-0 w-1" style={{ background: 'linear-gradient(to bottom,#f97316,#ea580c)' }} />
                         <div className="flex items-center gap-2 px-3 py-1 pl-5">
                           <button
@@ -560,7 +562,7 @@ export function RowInfoModal({ open, onOpenChange, point, isEditMode, allowMarke
                 {isEditMode && (
                   <button
                     onClick={() => { setQrDecodeStatus("idle"); setShowQRDialog(true) }}
-                    className="group flex w-full items-center gap-2 rounded-xl border border-border/80 bg-background/70 px-2.5 py-1.5 transition-all hover:bg-muted/45 active:scale-[0.98]"
+                    className="group flex w-full items-center gap-2 rounded-xl border border-border/80 bg-card/80 px-2.5 py-1.5 transition-all hover:bg-muted/45 active:scale-[0.98]"
                   >
                     <div className="relative flex h-6 w-6 shrink-0 items-center justify-center">
                       <QrCode className="h-3.5 w-3.5 text-orange-500" />

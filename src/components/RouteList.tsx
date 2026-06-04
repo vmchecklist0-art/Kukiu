@@ -3223,10 +3223,8 @@ export function RouteList({ variant = 'route-list' }: RouteListProps) {
                         </thead>
                         {/* ── Frozen Starting Point Row ─────────────────────── */}
                         <tbody>
-                          <tr className="sticky top-10 z-[9] border-b-2 border-primary/30"
-                            style={{ background: 'color-mix(in srgb, hsl(var(--primary)) 8%, hsl(var(--background)))' }}
-                          >
-                            {isEditMode && <td className="px-4 h-9 w-12" />}
+                          <tr className="sticky top-10 z-[9] border-b-2 border-primary/30 bg-background/95">
+                            {isEditMode && <td className="px-4 h-9 w-12 bg-background/95" />}
                             {visibleDataColumns.map(col => {
                               const k = col.key as string
                               if (k === 'no') return (
@@ -3251,7 +3249,7 @@ export function RouteList({ variant = 'route-list' }: RouteListProps) {
                               )
                               if (k === 'km') return (
                                 <td key="sp-km" className="px-3 h-9 text-center">
-                                  <span className="text-[11px] text-muted-foreground font-mono">0.00</span>
+                                  <span className="text-[9px] font-semibold tabular-nums text-foreground">0 Km</span>
                                 </td>
                               )
                               if (k === 'latitude') return (
