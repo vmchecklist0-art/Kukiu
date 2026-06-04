@@ -300,11 +300,15 @@ async function handleRoutes(req: VercelRequest, res: VercelResponse) {
     created_at TIMESTAMP DEFAULT NOW(), updated_at TIMESTAMP DEFAULT NOW()
   )`;
   await sql`ALTER TABLE routes ADD COLUMN IF NOT EXISTS color VARCHAR(20) DEFAULT NULL`;
+  await sql`ALTER TABLE routes ADD COLUMN IF NOT EXISTS start_lat double precision DEFAULT NULL`;
+  await sql`ALTER TABLE routes ADD COLUMN IF NOT EXISTS start_lng double precision DEFAULT NULL`;
   if (req.method === 'GET') {
     const result = await sql`SELECT * FROM routes ORDER BY created_at ASC`;
     const routes = result.map((row: Record<string, unknown>) => ({
       id: row.id, name: row.name, code: row.code, shift: row.shift,
       color: row.color ?? null,
+      startLat: row.start_lat ?? null,
+      startLng: row.start_lng ?? null,
       deliveryPoints: row.delivery_points, updatedAt: row.updated_at,
     }));
     return res.status(200).json({ success: true, data: routes });
@@ -318,18 +322,28 @@ async function handleRoutes(req: VercelRequest, res: VercelResponse) {
     else { await sql`DELETE FROM routes`; }
     for (const route of routes) {
       const isChanged = changedIds.includes(route.id);
-      await sql`INSERT INTO routes (id, name, code, shift, delivery_points, color, updated_at)
-        VALUES (${route.id}, ${route.name}, ${route.code}, ${route.shift}, ${JSON.stringify(route.deliveryPoints)}, ${route.color ?? null}, NOW())
+      const sLat = typeof route.startLat === 'number' ? route.startLat : null;
+      const sLng = typeof route.startLng === 'number' ? route.startLng : null;
+      await sql`INSERT INTO routes (id, name, code, shift, delivery_points, color, start_lat, start_lng, updated_at)
+        VALUES (${route.id}, ${route.name}, ${route.code}, ${route.shift}, ${JSON.stringify(route.deliveryPoints)}, ${route.color ?? null}, ${sLat}, ${sLng}, NOW())
         ON CONFLICT (id) DO UPDATE SET name=EXCLUDED.name, code=EXCLUDED.code, shift=EXCLUDED.shift,
           delivery_points=EXCLUDED.delivery_points, color=EXCLUDED.color,
+          start_lat=EXCLUDED.start_lat, start_lng=EXCLUDED.start_lng,
           updated_at=CASE WHEN ${isChanged} THEN NOW() ELSE routes.updated_at END`;
     }
     return res.status(200).json({ success: true });
   }
   if (req.method === 'PATCH') {
-    const { id, color } = req.body;
-    if (!id || !color) return res.status(400).json({ success: false, error: 'id dan color diperlukan' });
-    await sql`UPDATE routes SET color=${color}, updated_at=NOW() WHERE id=${id}`;
+    const { id, color, startLat, startLng } = req.body;
+    if (!id) return res.status(400).json({ success: false, error: 'id diperlukan' });
+    if (color !== undefined) {
+      await sql`UPDATE routes SET color=${color}, updated_at=NOW() WHERE id=${id}`;
+    }
+    if (startLat !== undefined && startLng !== undefined) {
+      const sLat = typeof startLat === 'number' ? startLat : null;
+      const sLng = typeof startLng === 'number' ? startLng : null;
+      await sql`UPDATE routes SET start_lat=${sLat}, start_lng=${sLng}, updated_at=NOW() WHERE id=${id}`;
+    }
     return res.status(200).json({ success: true });
   }
   return res.status(405).json({ success: false, error: `Method ${req.method} tidak dibenarkan` });

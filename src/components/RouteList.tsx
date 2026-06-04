@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from "react"
 import { useRoadDistances } from "@/hooks/use-road-distances"
 import { useRegisterRefresh } from "@/contexts/RefreshContext"
-import { ClipboardList, List, Info, Plus, Check, X, Edit2, Trash2, Search, Save, ArrowUp, ArrowDown, Truck, Cog, CheckCircle2, MapPin, Route, AlertCircle, History, MapPinned, TableProperties, Shrink, Expand, ChevronUp, ChevronDown, ChevronsUpDown, Filter, ChevronLeft, ChevronRight, RotateCcw, Layers, GripVertical, Columns, ArrowUpDown, Eye, EyeOff, Lock, Navigation2, Map as MapIcon, SlidersHorizontal } from "lucide-react"
+import { ClipboardList, List, Info, Plus, Check, X, CreditCard as Edit2, Trash2, Search, Save, ArrowUp, ArrowDown, Truck, Cog, CircleCheck as CheckCircle2, MapPin, Route, CircleAlert as AlertCircle, History, MapPinned, TableProperties, Shrink, Expand, ChevronUp, ChevronDown, ChevronsUpDown, ListFilter as Filter, ChevronLeft, ChevronRight, RotateCcw, Layers, GripVertical, Columns2 as Columns, ArrowUpDown, Eye, EyeOff, Lock, Navigation2, Map as MapIcon, SlidersHorizontal } from "lucide-react"
 import { cn, parseSmartQuery, isDeliveryActive } from "@/lib/utils"
 import { optimizeRouteOrder } from "@/lib/route-optimizer"
 import { toast } from "sonner"
@@ -134,6 +134,8 @@ interface Route {
   code: string
   shift: string
   color?: string
+  startLat?: number | null
+  startLng?: number | null
   deliveryPoints: DeliveryPoint[]
   labels?: string[]
   updatedAt?: string
@@ -788,6 +790,8 @@ export function RouteList({ variant = 'route-list' }: RouteListProps) {
         setRoutes(data.data.map((r: Route) => ({
           ...r,
           color: r.color ?? null,
+          startLat: typeof r.startLat === 'number' ? r.startLat : null,
+          startLng: typeof r.startLng === 'number' ? r.startLng : null,
           deliveryPoints: Array.isArray(r.deliveryPoints) ? r.deliveryPoints : [],
         })))
         // Keep current route if it still exists, else go to first
@@ -1135,6 +1139,9 @@ export function RouteList({ variant = 'route-list' }: RouteListProps) {
   const [draftCoordinates, setDraftCoordinates] = useState<Record<string, { lat: string; lng: string }>>({})
   const [coordinateBaseline, setCoordinateBaseline] = useState<Record<string, { lat: string; lng: string }>>({})
   const [sortConflictPending, setSortConflictPending] = useState<SortType | null>(null)
+  // Inline start-point editing in the frozen table row
+  const [editingStartPoint, setEditingStartPoint] = useState(false)
+  const [startPointDraft, setStartPointDraft] = useState({ lat: '', lng: '' })
 
   const openRouteDetail = useCallback((routeId: string) => {
     setCurrentRouteId(routeId)
@@ -1147,11 +1154,27 @@ export function RouteList({ variant = 'route-list' }: RouteListProps) {
     setShowPolyline(false)
     setMapRefitToken(0)
     setMapResizeToken(0)
-  }, [])
+    // Seed kmStartPoint from route's saved start point
+    const route = routes.find(r => r.id === routeId)
+    if (route && typeof route.startLat === 'number' && typeof route.startLng === 'number') {
+      setKmStartPoint({ lat: route.startLat, lng: route.startLng })
+    } else {
+      setKmStartPoint(DEFAULT_MAP_CENTER)
+    }
+  }, [routes])
 
-  useEffect(() => {
-    try { localStorage.setItem(LS_MAP_STYLE, mapStyle) } catch { /**/ }
-  }, [mapStyle])
+  const saveStartPointEdit = useCallback(() => {
+    const lat = parseFloat(startPointDraft.lat)
+    const lng = parseFloat(startPointDraft.lng)
+    if (!isFinite(lat) || !isFinite(lng)) { setEditingStartPoint(false); return }
+    const next = { lat, lng }
+    setKmStartPoint(next)
+    setRoutes(prev => prev.map(r =>
+      r.id === currentRouteId ? { ...r, startLat: lat, startLng: lng } : r
+    ))
+    setHasUnsavedChanges(true)
+    setEditingStartPoint(false)
+  }, [startPointDraft, currentRouteId])
 
   useEffect(() => {
     if (!mapSettingsOpen) return
@@ -1495,6 +1518,13 @@ export function RouteList({ variant = 'route-list' }: RouteListProps) {
     setKmStartPoint({ ...draftKmStartPoint })
     setMapRefitToken((value) => value + 1)
     setMapResizeToken((value) => value + 1)
+    // Persist start point to the current route
+    setRoutes(prev => prev.map(r =>
+      r.id === currentRouteId
+        ? { ...r, startLat: draftKmStartPoint.lat, startLng: draftKmStartPoint.lng }
+        : r
+    ))
+    setHasUnsavedChanges(true)
   }
 
   const resetMarkerPolySettings = () => {
@@ -1998,7 +2028,9 @@ export function RouteList({ variant = 'route-list' }: RouteListProps) {
       const old = before.find(r => r.id === route.id)
       if (!old) { changedRouteIds.push(route.id); return }
       const hasMetaChange = old.name !== route.name || old.code !== route.code ||
-                            old.shift !== route.shift || (old.color ?? null) !== (route.color ?? null)
+                            old.shift !== route.shift || (old.color ?? null) !== (route.color ?? null) ||
+                            (old.startLat ?? null) !== (route.startLat ?? null) ||
+                            (old.startLng ?? null) !== (route.startLng ?? null)
       const hasPtsChange  = JSON.stringify(getRouteDeliveryPoints(old)) !== JSON.stringify(getRouteDeliveryPoints(route))
       const hasLabelChange = JSON.stringify(toCustomLabels(old.labels).slice().sort()) !==
                              JSON.stringify(toCustomLabels(route.labels).slice().sort())
@@ -3205,6 +3237,108 @@ export function RouteList({ variant = 'route-list' }: RouteListProps) {
                                 )}
                           </tr>
                         </thead>
+                        {/* ── Frozen Starting Point Row ─────────────────────── */}
+                        <tbody>
+                          <tr className="sticky top-10 z-[9] border-b-2 border-primary/30"
+                            style={{ background: 'color-mix(in srgb, hsl(var(--primary)) 8%, hsl(var(--background)))' }}
+                          >
+                            {isEditMode && <td className="px-4 h-9 w-12" />}
+                            {visibleDataColumns.map(col => {
+                              const k = col.key as string
+                              if (k === 'latitude') {
+                                return (
+                                  <td key="sp-lat" className="px-3 h-9 text-center">
+                                    {editingStartPoint ? (
+                                      <input
+                                        autoFocus
+                                        type="text"
+                                        value={startPointDraft.lat}
+                                        onChange={e => setStartPointDraft(d => ({ ...d, lat: e.target.value }))}
+                                        onKeyDown={e => { if (e.key === 'Enter') saveStartPointEdit(); if (e.key === 'Escape') setEditingStartPoint(false) }}
+                                        className="w-24 rounded border border-primary bg-background px-1.5 py-0.5 text-[11px] font-mono text-center outline-none focus:ring-1 focus:ring-primary"
+                                        placeholder="Lat"
+                                      />
+                                    ) : (
+                                      <span className="font-mono text-[11px] text-foreground/80">{kmStartPoint.lat.toFixed(6)}</span>
+                                    )}
+                                  </td>
+                                )
+                              }
+                              if (k === 'longitude') {
+                                return (
+                                  <td key="sp-lng" className="px-3 h-9 text-center">
+                                    {editingStartPoint ? (
+                                      <input
+                                        type="text"
+                                        value={startPointDraft.lng}
+                                        onChange={e => setStartPointDraft(d => ({ ...d, lng: e.target.value }))}
+                                        onKeyDown={e => { if (e.key === 'Enter') saveStartPointEdit(); if (e.key === 'Escape') setEditingStartPoint(false) }}
+                                        className="w-24 rounded border border-primary bg-background px-1.5 py-0.5 text-[11px] font-mono text-center outline-none focus:ring-1 focus:ring-primary"
+                                        placeholder="Lng"
+                                      />
+                                    ) : (
+                                      <span className="font-mono text-[11px] text-foreground/80">{kmStartPoint.lng.toFixed(6)}</span>
+                                    )}
+                                  </td>
+                                )
+                              }
+                              if (col.key === 'no') {
+                                return (
+                                  <td key="sp-no" className="px-3 h-9 text-center">
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-bold text-primary">
+                                      <MapPin className="size-2.5" />
+                                      Start
+                                    </span>
+                                  </td>
+                                )
+                              }
+                              if (col.key === 'name') {
+                                return (
+                                  <td key="sp-name" className="px-3 h-9 text-center font-semibold text-[11px] text-foreground/70">
+                                    Starting Point
+                                  </td>
+                                )
+                              }
+                              return <td key={`sp-${col.key}`} className="px-3 h-9" />
+                            })}
+                            {isActionColumnVisible && (
+                              <td className="px-3 h-9 text-center">
+                                {editingStartPoint ? (
+                                  <div className="inline-flex items-center gap-1">
+                                    <button
+                                      type="button"
+                                      onClick={saveStartPointEdit}
+                                      className="flex size-6 items-center justify-center rounded bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
+                                      title="Save"
+                                    >
+                                      <Check className="size-3" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setEditingStartPoint(false)}
+                                      className="flex size-6 items-center justify-center rounded border border-border text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+                                      title="Cancel"
+                                    >
+                                      <X className="size-3" />
+                                    </button>
+                                  </div>
+                                ) : isEditMode ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setStartPointDraft({ lat: String(kmStartPoint.lat), lng: String(kmStartPoint.lng) })
+                                      setEditingStartPoint(true)
+                                    }}
+                                    className="flex size-6 items-center justify-center rounded border border-border text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors mx-auto"
+                                    title="Edit starting point"
+                                  >
+                                    <Edit2 className="size-3" />
+                                  </button>
+                                ) : null}
+                              </td>
+                            )}
+                          </tr>
+                        </tbody>
                         <tbody>
                           {tableRows.map(({ point, index }) => {
                             const isActive = isDeliveryActive(point.delivery)
