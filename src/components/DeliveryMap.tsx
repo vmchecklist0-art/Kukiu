@@ -48,7 +48,6 @@ interface TileConfigItem {
   subdomains: string[]
   maxZoom: number
   maxNativeZoom: number
-  crossOrigin: boolean
 }
 
 function isDeliveryOnToday(delivery: string, date: Date = new Date()): boolean {
@@ -76,20 +75,18 @@ function isDeliveryOnToday(delivery: string, date: Date = new Date()): boolean {
 
 const TILE_CONFIG: Record<"google-streets" | "google-satellite" | "osm", TileConfigItem> = {
   "google-streets": {
-    attribution: "Map data © Google",
-    url: "https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}",
-    subdomains: ["mt0", "mt1", "mt2", "mt3"],
-    maxZoom: 20,
-    maxNativeZoom: 20,
-    crossOrigin: false, // Google tiles don't send CORS headers
+    attribution: "&copy; <a href='https://www.openstreetmap.org/copyright'>OpenStreetMap</a> contributors",
+    url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+    subdomains: ["a", "b", "c"],
+    maxZoom: 19,
+    maxNativeZoom: 19,
   },
   "google-satellite": {
-    attribution: "Map data © Google",
-    url: "https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
-    subdomains: ["mt0", "mt1", "mt2", "mt3"],
+    attribution: "Source: ESRI World Imagery",
+    url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    subdomains: [],
     maxZoom: 20,
     maxNativeZoom: 20,
-    crossOrigin: false, // Google tiles don't send CORS headers
   },
   osm: {
     attribution: "&copy; <a href='https://www.openstreetmap.org/copyright'>OpenStreetMap</a> contributors &copy; <a href='https://carto.com/attributions'>CARTO</a>",
@@ -97,7 +94,6 @@ const TILE_CONFIG: Record<"google-streets" | "google-satellite" | "osm", TileCon
     subdomains: ["a", "b", "c", "d"],
     maxZoom: 20,
     maxNativeZoom: 19,
-    crossOrigin: true,
   },
 }
 
@@ -268,21 +264,6 @@ function MapInteractionWatcher({ onStart, onEnd }: { onStart: () => void; onEnd:
   return null
 }
 
-function TileLoadController({ onLoadingChange }: { onLoadingChange: (loading: boolean) => void }) {
-  const map = useMap()
-  useEffect(() => {
-    const onStart = () => onLoadingChange(true)
-    const onDone = () => onLoadingChange(false)
-    map.on('loading', onStart)
-    map.on('load', onDone)
-    return () => {
-      map.off('loading', onStart)
-      map.off('load', onDone)
-    }
-  }, [map, onLoadingChange])
-  return null
-}
-
 function ResizeController({ resizeToken }: { resizeToken?: number }) {
   const map = useMap()
 
@@ -383,18 +364,10 @@ export function DeliveryMap({ deliveryPoints, scrollZoom = false, showPolyline =
   const [activeMapStyle, setActiveMapStyle] = useState<typeof mapStyle>(mapStyle)
   const [showPolylineState, setShowPolylineState] = useState<boolean>(showPolyline)
   const [markerStyleState, setMarkerStyleState] = useState<typeof markerStyle>(markerStyle)
-  const [tileLoading, setTileLoading] = useState(false)
 
   useEffect(() => { setActiveMapStyle(mapStyle) }, [mapStyle])
   useEffect(() => { setShowPolylineState(showPolyline) }, [showPolyline])
   useEffect(() => { setMarkerStyleState(markerStyle) }, [markerStyle])
-
-  // Show loading overlay immediately on style switch
-  useEffect(() => { setTileLoading(true) }, [activeMapStyle])
-
-  const handleTileLoadingChange = useCallback((loading: boolean) => {
-    setTileLoading(loading)
-  }, [])
 
   const tiles = TILE_CONFIG[activeMapStyle]
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -421,10 +394,9 @@ export function DeliveryMap({ deliveryPoints, scrollZoom = false, showPolyline =
   const deferredPoints = useDeferredValue(validPoints)
 
   // Render marker nodes progressively to avoid long first-paint stalls on large routes.
-  // Only reset on data/style changes — NOT on map tile style changes, which are independent.
   useEffect(() => {
     setRenderedMarkerCount(INITIAL_MARKER_RENDER)
-  }, [deferredPoints.length, markerStyleState])
+  }, [deferredPoints.length, activeMapStyle, markerStyleState])
 
   useEffect(() => {
     if (renderedMarkerCount >= deferredPoints.length) return
@@ -574,9 +546,7 @@ export function DeliveryMap({ deliveryPoints, scrollZoom = false, showPolyline =
       >
         <MapReadyController onReady={setMapRef} />
         <MapInteractionWatcher onStart={handleInteractStart} onEnd={handleInteractEnd} />
-        <TileLoadController onLoadingChange={handleTileLoadingChange} />
       <TileLayer
-        key={activeMapStyle}
         attribution={tiles.attribution}
         url={tiles.url}
         subdomains={tiles.subdomains}
@@ -586,7 +556,7 @@ export function DeliveryMap({ deliveryPoints, scrollZoom = false, showPolyline =
         updateWhenZooming={false}
         keepBuffer={4}
         detectRetina={false}
-        crossOrigin={tiles.crossOrigin}
+        crossOrigin={true}
       />
       <ResizeController resizeToken={resizeToken} />
       <BoundsController points={deferredPoints} startPoint={startPoint} includeStartInBounds={includeStartInBounds} refitToken={refitToken} />
@@ -625,30 +595,6 @@ export function DeliveryMap({ deliveryPoints, scrollZoom = false, showPolyline =
       ))}
       </MapContainer>
 
-      {/* Tile loading overlay — shown while new tile style is fetching */}
-      {tileLoading && (
-        <div style={{
-          position: 'absolute', inset: 0, zIndex: 500, pointerEvents: 'none',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: 'rgba(0,0,0,0.18)', backdropFilter: 'blur(3px)', WebkitBackdropFilter: 'blur(3px)',
-          borderRadius: 'inherit',
-        }}>
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 8,
-            background: 'color-mix(in srgb, var(--card) 92%, transparent)',
-            border: '1px solid color-mix(in srgb, var(--border) 70%, transparent)',
-            borderRadius: 10, padding: '7px 14px',
-            boxShadow: '0 4px 16px rgba(0,0,0,0.18)',
-            color: 'var(--foreground)', fontSize: 12, fontWeight: 600,
-          }}>
-            <svg style={{ animation: 'spin 0.9s linear infinite' }} xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
-            </svg>
-            Loading map…
-          </div>
-        </div>
-      )}
-
       {/* Control panel overlay */}
       <div style={{ position: 'absolute', top: 10, left: 10, zIndex: 1000, pointerEvents: 'none', opacity: controlsVisible ? 1 : 0, transform: controlsVisible ? 'translateY(0)' : 'translateY(-6px)', transition: 'opacity 0.25s ease, transform 0.25s ease' }}>
         <div style={{ pointerEvents: controlsVisible ? 'auto' : 'none', background: 'color-mix(in srgb, var(--card) 88%, transparent)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', borderRadius: 10, padding: 4, border: '1px solid color-mix(in srgb, var(--border) 60%, transparent)', boxShadow: '0 2px 10px color-mix(in srgb, var(--foreground) 12%, transparent)', display: 'flex', gap: 3, alignItems: 'center', color: 'var(--foreground)' }}>
@@ -657,7 +603,21 @@ export function DeliveryMap({ deliveryPoints, scrollZoom = false, showPolyline =
             <button aria-label="Zoom out" onClick={() => mapRef.current?.zoomOut()} style={{ width: 24, height: 24, borderRadius: 6, border: 'none', background: 'transparent', color: 'var(--foreground)', fontSize: 15, lineHeight: 1, cursor: 'pointer' }}>−</button>
           </div>
           <span style={{ width: 1, height: 16, background: 'color-mix(in srgb, var(--border) 70%, transparent)' }} />
-          <select value={activeMapStyle} onChange={(e) => setActiveMapStyle(e.target.value as any)} style={{ height: 24, borderRadius: 6, padding: '0 4px', border: 'none', background: 'transparent', color: 'var(--foreground)', fontSize: 11, cursor: 'pointer' }}>
+          <select
+            value={activeMapStyle}
+            onChange={(e) => setActiveMapStyle(e.target.value as typeof activeMapStyle)}
+            style={{
+              height: 28,
+              borderRadius: 8,
+              border: '1px solid color-mix(in srgb, var(--border) 50%, transparent)',
+              background: 'color-mix(in srgb, var(--card) 92%, transparent)',
+              color: 'var(--foreground)',
+              fontSize: 11,
+              fontWeight: 600,
+              cursor: 'pointer',
+              padding: '0 10px',
+            }}
+          >
             <option value="google-streets">Streets</option>
             <option value="google-satellite">Satellite</option>
             <option value="osm">OSM</option>
